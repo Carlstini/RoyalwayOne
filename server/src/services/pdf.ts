@@ -203,6 +203,8 @@ export async function mergePdfs(files: Uint8Array[]): Promise<Uint8Array> {
 /** Parse "1-3,5,8-" into zero-based page indices. */
 export function parseRanges(spec: string, pageCount: number): number[] {
   const indices: number[] = [];
+  // "all" (or "*") is a natural thing to type, so accept it as every page.
+  if (/^(all|\*)$/i.test(spec.trim())) return Array.from({ length: pageCount }, (_, i) => i);
   for (const part of spec.split(',').map((s) => s.trim()).filter(Boolean)) {
     const m = /^(\d+)?\s*(-)?\s*(\d+)?$/.exec(part);
     if (!m) throw new AppError(`"${part}" is not a valid page range.`, 400, 'BAD_REQUEST');

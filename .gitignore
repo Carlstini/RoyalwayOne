@@ -5,3 +5,7 @@ dist
 storage
 coverage
 *.log
+
+# Local runtime storage (uploads, temp files, json store)
+server/.storage/
+.storage/

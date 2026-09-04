@@ -371,7 +371,24 @@ export const videoTools: ToolDefinition[] = [
       for (const [i, file] of ctx.files.entries()) {
         await ctx.setStage(`preparing clip ${i + 1} of ${ctx.files.length}`);
         const dest = outPath('.mp4');
-        await ffmpeg(['-i', file.path, '-vf', 'scale=1280:-2:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30', '-c:v', 'libx264', '-crf', '22', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-ar', '48000', '-ac', '2', '-shortest', dest]);
+        // A fixed 1280x720 canvas with padding, plus a guaranteed silent track for
+        // clips that have no audio, so every clip concatenates cleanly.
+        await ffmpeg([
+          '-i', file.path,
+          '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
+          '-map', '0:v:0', '-map', '0:a:0?', '-map', '1:a:0',
+          '-filter_complex', '[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v];[0:a:0][1:a]amix=inputs=2:duration=first:dropout_transition=0[a]',
+          '-map', '[v]', '-map', '[a]',
+          '-c:v', 'libx264', '-crf', '22', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
+          '-c:a', 'aac', '-ar', '48000', '-ac', '2', '-shortest', dest,
+        ]).catch(() => ffmpeg([
+          '-i', file.path,
+          '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
+          '-vf', 'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30',
+          '-map', '0:v:0', '-map', '1:a:0',
+          '-c:v', 'libx264', '-crf', '22', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
+          '-c:a', 'aac', '-ar', '48000', '-ac', '2', '-shortest', dest,
+        ]));
         normalised.push(dest);
       }
       await ctx.setStage('merging');
