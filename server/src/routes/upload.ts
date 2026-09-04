@@ -8,6 +8,7 @@ import { AppError, notFound, tooLarge } from '../lib/errors.js';
 import { suggestForFiles } from '../tools/registry.js';
 import { recordEvent } from '../lib/jobs.js';
 import { uploadLimiter } from '../lib/rate-limit.js';
+import * as pdf from '../services/pdf.js';
 
 const BLOCKED_EXTENSIONS = /\.(exe|dll|so|dylib|bat|cmd|com|scr|msi|apk|jar|sh|ps1|vbs|php|py|rb|pl)$/i;
 
@@ -58,6 +59,41 @@ uploadRouter.get('/files/:id', async (req, res, next) => {
     res.setHeader('Cache-Control', 'private, max-age=300');
     res.setHeader('Content-Disposition', `${download === '0' ? 'inline' : 'attachment'}; filename="${encodeURIComponent(file.name)}"`);
     fileStream(file).pipe(res);
+  } catch (err) { next(err); }
+});
+
+/**
+ * Rasterised page previews for the interactive editors (sign, redact).
+ * Returns page images plus the true PDF point size so the browser can map a
+ * click on the preview back onto exact PDF coordinates.
+ */
+uploadRouter.get('/files/:id/pages', async (req, res, next) => {
+  try {
+    const file = await getFile(req.params.id);
+    if (!file) throw notFound('That file is no longer available. Files are removed automatically after a short time.');
+    if (file.sessionId !== req.sessionId) throw new AppError('That file does not belong to this session.', 403, 'FORBIDDEN');
+    if (file.mime !== 'application/pdf') throw new AppError('Page previews are only available for PDFs.', 400, 'UNSUPPORTED_TYPE');
+
+    const bytes = await pdf.readFileBytes(file.path);
+    const sizes = await pdf.pdfPageSizes(bytes);
+    const from = Math.max(0, Number(req.query.from ?? 0));
+    const limit = Math.min(Number(req.query.limit ?? 5), 10);
+    const dpi = Math.min(Math.max(Number(req.query.dpi ?? 96), 40), 200);
+    const wanted = sizes.map((_, i) => i).slice(from, from + limit);
+    const rendered = await pdf.renderPages(bytes, { dpi, format: 'jpeg', quality: 78, pages: wanted });
+
+    res.json({
+      ok: true,
+      pageCount: sizes.length,
+      pages: rendered.map((r) => ({
+        index: r.index,
+        image: `data:image/jpeg;base64,${Buffer.from(r.buffer).toString('base64')}`,
+        pixelWidth: r.width,
+        pixelHeight: r.height,
+        pointWidth: sizes[r.index]?.width ?? r.width,
+        pointHeight: sizes[r.index]?.height ?? r.height,
+      })),
+    });
   } catch (err) { next(err); }
 });
 

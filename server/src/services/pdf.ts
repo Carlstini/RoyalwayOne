@@ -389,6 +389,15 @@ export async function extractPdfText(bytes: Uint8Array, password?: string): Prom
   return pages;
 }
 
+/** Page dimensions in PDF points — the canvas editors map clicks back into this space. */
+export async function pdfPageSizes(bytes: Uint8Array): Promise<{ width: number; height: number }[]> {
+  const doc = await loadPdf(bytes);
+  return doc.getPages().map((page) => {
+    const { width, height } = page.getSize();
+    return { width, height };
+  });
+}
+
 export async function pdfPageCount(bytes: Uint8Array): Promise<number> {
   const doc = await loadPdf(bytes);
   return doc.getPageCount();

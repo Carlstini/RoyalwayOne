@@ -3,9 +3,31 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
 import { api, type Tool } from '../lib/api';
 
+const NAV_LINKS: [string, string][] = [
+  ['/tools', 'All tools'],
+  ['/transcribe', 'Transcribe'],
+  ['/ai/document-chat', 'Ask a document'],
+  ['/workflows', 'Workflows'],
+];
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => { window.scrollTo(0, 0); setMenuOpen(false); }, [location.pathname]);
+
+  // Never leave the drawer open when the layout widens back to desktop.
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 901px)');
+    const close = () => setMenuOpen(false);
+    mq.addEventListener('change', close);
+    return () => mq.removeEventListener('change', close);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <>
@@ -18,13 +40,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
           <div className="header__search"><QuickSearch /></div>
           <nav className="nav" aria-label="Main">
-            <NavLink to="/tools">All tools</NavLink>
-            <NavLink to="/transcribe">Transcribe</NavLink>
-            <NavLink to="/ai/document-chat">Ask a document</NavLink>
-            <NavLink to="/workflows">Workflows</NavLink>
+            {NAV_LINKS.map(([to, label]) => <NavLink key={to} to={to}>{label}</NavLink>)}
           </nav>
+          <button
+            className="nav-toggle"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-nav"
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            <Icon name={menuOpen ? 'close' : 'menu'} size={20} />
+          </button>
         </div>
       </header>
+      {menuOpen && (
+        <div className="nav-drawer" id="mobile-nav">
+          <div className="nav-drawer__search"><QuickSearch /></div>
+          {NAV_LINKS.map(([to, label]) => <NavLink key={to} to={to} onClick={() => setMenuOpen(false)}>{label}</NavLink>)}
+        </div>
+      )}
       <main id="main">{children}</main>
       <footer className="footer">
         <div className="footer__inner">

@@ -9,3 +9,9 @@ coverage
 # Local runtime storage (uploads, temp files, json store)
 server/.storage/
 .storage/
+
+# Local test fixtures and audit scripts
+.testdata/
+
+# TS incremental build cache
+*.tsbuildinfo

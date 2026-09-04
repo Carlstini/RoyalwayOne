@@ -61,6 +61,7 @@ const PATHS: Record<string, string> = {
   download: 'M12 4v11 M8 12l4 4 4-4 M4 20h16',
   copy: 'M9 9h11v11H9z M5 15H4V4h11v1',
   close: 'M6 6l12 12 M18 6L6 18',
+  menu: 'M4 7h16 M4 12h16 M4 17h16',
   plus: 'M12 5v14 M5 12h14',
   arrow: 'M5 12h14 M13 6l6 6-6 6',
   upload: 'M12 16V5 M8 9l4-4 4 4 M4 20h16',

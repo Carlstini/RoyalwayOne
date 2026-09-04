@@ -12,6 +12,9 @@ import { DocumentChatPage } from './pages/DocumentChatPage';
 import { ComparePage } from './pages/Compare';
 import { WorkflowsPage } from './pages/Workflows';
 import { RecorderPage } from './pages/Recorder';
+import { SignPdf } from './pages/SignPdf';
+import { RedactPdf } from './pages/RedactPdf';
+import { CropImage } from './pages/CropImage';
 import { Privacy } from './pages/Privacy';
 import { Admin } from './pages/Admin';
 import { NotFound } from './pages/NotFound';
@@ -32,6 +35,9 @@ export default function App() {
             <Route path="/transcribe/url" element={<Transcribe mode="url" />} />
             <Route path="/ai/document-chat" element={<DocumentChatPage />} />
             <Route path="/ai/compare" element={<ComparePage />} />
+            <Route path="/pdf/sign" element={<SignPdf />} />
+            <Route path="/pdf/redact" element={<RedactPdf />} />
+            <Route path="/image/crop" element={<CropImage />} />
             <Route path="/audio/recorder" element={<RecorderPage kind="audio" />} />
             <Route path="/video/recorder" element={<RecorderPage kind="video" />} />
             <Route path="/workflows" element={<WorkflowsPage />} />
