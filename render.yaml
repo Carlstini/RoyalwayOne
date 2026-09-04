@@ -1,0 +1,115 @@
+# Royalway One — Render blueprint
+#
+# Deploy: push this repo to GitHub, then in Render choose
+# "New +" -> "Blueprint" and point it at the repository.
+#
+# ---------------------------------------------------------------------------
+# TOPOLOGY NOTE (important — do not "optimise" this into two services)
+# ---------------------------------------------------------------------------
+# Royalway One stores uploads, intermediate artefacts and outputs on a
+# persistent disk. On Render, "A persistent disk is accessible by only a single
+# service instance" — it cannot be mounted by a second service.
+#
+# That means a separate background-worker service CANNOT read files uploaded
+# through the web service. Heavy jobs (OCR, transcription, video encoding)
+# would fail with "One of your files is no longer available."
+#
+# So the web service runs the job worker in-process (RUN_WORKER=true) and owns
+# the single disk. This is a correct, supported production topology: jobs are
+# still queued and processed asynchronously with bounded concurrency, and the
+# HTTP layer never blocks on them.
+#
+# Splitting the worker into its own service requires replacing disk storage
+# with shared object storage (e.g. S3/R2). The code has a `worker` entrypoint
+# ready for that day (`npm run worker --workspace server`), but it is NOT
+# enabled here because this blueprint uses disks.
+# ---------------------------------------------------------------------------
+
+services:
+  - type: web
+    name: royalway-one
+    runtime: node
+    plan: standard          # sharp/mupdf/ffmpeg need real memory; starter will OOM on large files
+    region: frankfurt
+    branch: main
+    healthCheckPath: /api/health
+    # --include=dev is REQUIRED: NODE_ENV=production is set below, which makes
+    # `npm ci` skip devDependencies — and typescript/vite live there, so the
+    # build would fail with "tsc: not found" without it.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run start --workspace server
+    autoDeploy: true
+    disk:
+      name: royalway-storage
+      mountPath: /var/data
+      sizeGB: 20
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "8080"
+      - key: STORAGE_DIR
+        value: /var/data
+      - key: PUBLIC_URL
+        fromService:
+          type: web
+          name: royalway-one
+          property: host
+      - key: DATABASE_URL
+        fromDatabase:
+          name: royalway-db
+          property: connectionString
+
+      # Generated once by Render and never stored in git.
+      - key: SESSION_SECRET
+        generateValue: true          # rotating this invalidates existing download links
+      - key: ADMIN_TOKEN
+        generateValue: true          # /admin returns 404 until this is set
+
+      # This service processes its own job queue (see topology note above).
+      - key: RUN_WORKER
+        value: "true"
+      - key: WORKER_CONCURRENCY
+        value: "2"
+
+      - key: FILE_RETENTION_MINUTES
+        value: "120"
+      - key: MAX_UPLOAD_BYTES
+        value: "536870912"
+      - key: MAX_MEDIA_SECONDS
+        value: "14400"
+      - key: MAX_CONCURRENT_JOBS_PER_SESSION
+        value: "3"
+      - key: URL_INGEST_ENABLED
+        value: "true"
+
+      # ---- Provider credentials ----------------------------------------
+      # sync: false means Render PROMPTS for these in the dashboard and never
+      # reads them from git. No key value belongs in this file.
+      #
+      # Set OPENAI_API_KEY to switch on the AI Workspace, Business Tools,
+      # Document AI *and* transcription (Whisper) with a single key.
+      # Optionally add DEEPGRAM_API_KEY for better speaker diarization.
+      #
+      # Until at least one is set, /api/capabilities reports the feature as
+      # unavailable and the UI says so honestly rather than pretending.
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: DEEPGRAM_MODEL
+        value: nova-2
+
+databases:
+  - name: royalway-db
+    databaseName: royalway
+    user: royalway
+    plan: basic-256mb
+    region: frankfurt
+    postgresMajorVersion: "16"

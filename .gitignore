@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# ---------------------------------------------------------------------------
+# Local environment files — NEVER commit real credentials.
+# `.env.example` is deliberately tracked (names only, no values).
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------------------
+# Runtime storage: uploads, temporary files, generated outputs, JSON job store.
+# These are user data and processing artefacts — never source.
+# ---------------------------------------------------------------------------
+.storage/
+server/.storage/
+storage/
+uploads/
+tmp/
+.tmp/
+*.tmp
+
+# Local test-run storage directories created while verifying the build
+.prodstorage/
+.nokeystorage/
+.faultstorage*/
+
+# Tesseract OCR language data downloaded at runtime
+tessdata/
+
+# ---------------------------------------------------------------------------
+# Test fixtures, audit harnesses and any local test credentials.
+# `.testdata/` holds generated media/PDF fixtures and the local contract
+# harness used for offline protocol testing. It is intentionally untracked:
+# it is large, regenerable, and must never be mistaken for product code.
+# ---------------------------------------------------------------------------
+.testdata/
+
+# Test and coverage output
+coverage/
+.nyc_output/
+*.lcov
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
