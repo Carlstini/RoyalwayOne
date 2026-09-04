@@ -131,6 +131,10 @@ export function createApp() {
     if (err?.type === 'entity.too.large') {
       return res.status(413).json({ ok: false, error: { code: 'PAYLOAD_TOO_LARGE', message: 'That request was too large.' } });
     }
+    // A body the client sent wrong is a 400, not a server fault.
+    if (err?.type === 'entity.parse.failed' || (err instanceof SyntaxError && 'body' in (err as any))) {
+      return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: 'We could not read that request. Please try again.' } });
+    }
     req.log?.error({ err }, 'unhandled error');
     res.status(500).json({ ok: false, error: { code: 'INTERNAL', message: 'Something went wrong on our side. Please try again.' } });
   });

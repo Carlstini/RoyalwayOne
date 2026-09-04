@@ -22,16 +22,28 @@ export class DeepgramProvider implements TranscriptionProvider {
 
     options.onStage?.('transcribing');
     const body = fs.createReadStream(filePath);
-    const res = await fetch(`https://api.deepgram.com/v1/listen?${params}`, {
-      method: 'POST',
-      headers: { authorization: `Token ${config.transcription.deepgramKey}`, 'content-type': options.mimeType ?? 'audio/wav' },
-      body: body as any,
-      duplex: 'half',
-      signal: options.signal,
-    } as any);
+    let res: Response;
+    try {
+      res = await fetch(`${config.transcription.deepgramBaseUrl}/v1/listen?${params}`, {
+        method: 'POST',
+        headers: { authorization: `Token ${config.transcription.deepgramKey}`, 'content-type': options.mimeType ?? 'audio/wav' },
+        body: body as any,
+        duplex: 'half',
+        signal: options.signal,
+      } as any);
+    } catch (err) {
+      // Network/DNS/TLS failure: never surface a raw stack trace to the user.
+      if ((err as Error)?.name === 'AbortError') {
+        throw new AppError('The transcription took too long and was stopped. Please try a shorter recording.', 504, 'TRANSCRIPTION_TIMEOUT');
+      }
+      logger.warn({ err }, 'deepgram unreachable');
+      throw new AppError('We could not reach the transcription service. Please try again shortly.', 502, 'TRANSCRIPTION_FAILED');
+    }
     if (!res.ok) {
       logger.warn({ status: res.status, detail: (await res.text()).slice(0, 400) }, 'deepgram error');
       if (res.status === 400) throw new AppError('We could not transcribe this recording. The audio may be silent or corrupted.', 422, 'TRANSCRIPTION_FAILED');
+      if (res.status === 401 || res.status === 403) throw new AppError('Transcription is not configured correctly for this deployment.', 503, 'TRANSCRIPTION_NOT_CONFIGURED');
+      if (res.status === 429) throw new AppError('The transcription service is busy right now. Please try again in a moment.', 503, 'TRANSCRIPTION_BUSY');
       throw new AppError('The transcription service is unavailable right now. Please try again shortly.', 502, 'TRANSCRIPTION_FAILED');
     }
     const data: any = await res.json();

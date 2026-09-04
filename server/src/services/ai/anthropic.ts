@@ -33,6 +33,9 @@ export class AnthropicProvider implements AIProvider {
       });
       if (!res.ok) {
         logger.warn({ status: res.status, detail: (await res.text()).slice(0, 400) }, 'anthropic error');
+        if (res.status === 401 || res.status === 403) {
+          throw new AppError('AI is not configured correctly for this deployment.', 503, 'AI_NOT_CONFIGURED');
+        }
         throw new AppError('We could not complete this AI request. Please try again.', 502, 'AI_FAILED');
       }
       const data = await res.json() as any;

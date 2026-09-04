@@ -32,6 +32,8 @@ export const config = {
     provider: process.env.TRANSCRIPTION_PROVIDER ?? (process.env.DEEPGRAM_API_KEY ? 'deepgram' : process.env.OPENAI_API_KEY ? 'openai' : 'none'),
     deepgramKey: process.env.DEEPGRAM_API_KEY ?? '',
     deepgramModel: process.env.DEEPGRAM_MODEL ?? 'nova-2',
+    /** Override for Deepgram on-prem / self-hosted deployments or an egress proxy. */
+    deepgramBaseUrl: process.env.DEEPGRAM_BASE_URL ?? 'https://api.deepgram.com',
     openaiKey: process.env.OPENAI_API_KEY ?? '',
     openaiBaseUrl: process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1',
     openaiModel: process.env.OPENAI_TRANSCRIBE_MODEL ?? 'whisper-1',

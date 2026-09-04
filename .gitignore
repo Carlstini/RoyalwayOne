@@ -15,3 +15,8 @@ server/.storage/
 
 # TS incremental build cache
 *.tsbuildinfo
+
+# Local test-run storage directories
+.prodstorage/
+.nokeystorage/
+.faultstorage*/

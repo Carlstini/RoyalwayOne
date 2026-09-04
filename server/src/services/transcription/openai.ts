@@ -72,14 +72,26 @@ export class OpenAITranscriptionProvider implements TranscriptionProvider {
     form.append('timestamp_granularities[]', 'word');
     if (options.language) form.append('language', options.language);
 
-    const res = await fetch(`${config.transcription.openaiBaseUrl}/audio/transcriptions`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${config.transcription.openaiKey}` },
-      body: form,
-      signal: options.signal,
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${config.transcription.openaiBaseUrl}/audio/transcriptions`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${config.transcription.openaiKey}` },
+        body: form,
+        signal: options.signal,
+      });
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') {
+        throw new AppError('The transcription took too long and was stopped. Please try a shorter recording.', 504, 'TRANSCRIPTION_TIMEOUT');
+      }
+      logger.warn({ err }, 'openai transcription unreachable');
+      throw new AppError('We could not reach the transcription service. Please try again shortly.', 502, 'TRANSCRIPTION_FAILED');
+    }
     if (!res.ok) {
       logger.warn({ status: res.status, detail: (await res.text()).slice(0, 400) }, 'openai transcription error');
+      if (res.status === 401 || res.status === 403) throw new AppError('Transcription is not configured correctly for this deployment.', 503, 'TRANSCRIPTION_NOT_CONFIGURED');
+      if (res.status === 429) throw new AppError('The transcription service is busy right now. Please try again in a moment.', 503, 'TRANSCRIPTION_BUSY');
+      if (res.status === 400) throw new AppError('We could not transcribe this recording. The audio may be silent or corrupted.', 422, 'TRANSCRIPTION_FAILED');
       throw new AppError('We could not transcribe this recording. Please try again.', 502, 'TRANSCRIPTION_FAILED');
     }
     return res.json();

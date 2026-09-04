@@ -3,7 +3,9 @@ import { htmlToPdf } from './convert.js';
 import type { TranscriptSegment } from './transcription/index.js';
 
 export function formatTimestamp(seconds: number, withMillis = false, comma = false) {
-  const s = Math.max(0, seconds);
+  // Guard against NaN/Infinity so a bad duration can never write
+  // "NaN:NaN:NaN" into an SRT/VTT file that players would reject.
+  const s = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = Math.floor(s % 60);

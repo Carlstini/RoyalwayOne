@@ -1,0 +1,122 @@
+# Royalway One — Render blueprint
+#
+# One web service (API + built frontend), one background worker for heavy jobs,
+# a small Postgres instance for job/event bookkeeping, and a shared persistent
+# disk that both services mount for temporary file storage.
+#
+# Deploy: push this repo to GitHub, then in Render choose
+# "New +" -> "Blueprint" and point it at the repository.
+
+services:
+  - type: web
+    name: royalway-one
+    runtime: node
+    plan: standard          # sharp/mupdf/ffmpeg need real memory; starter will OOM on big files
+    region: frankfurt
+    branch: main
+    healthCheckPath: /api/health
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start --workspace server
+    autoDeploy: true
+    disk:
+      name: royalway-storage
+      mountPath: /var/data
+      sizeGB: 20
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "8080"
+      - key: STORAGE_DIR
+        value: /var/data
+      - key: PUBLIC_URL
+        fromService:
+          type: web
+          name: royalway-one
+          property: host
+      - key: DATABASE_URL
+        fromDatabase:
+          name: royalway-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true          # rotating this invalidates existing download links
+      - key: ADMIN_TOKEN
+        generateValue: true          # required before /admin will respond at all
+      # The dedicated worker below drains the queue, so the web process only serves
+      # requests. Set this to "true" if you delete the worker service.
+      - key: RUN_WORKER
+        value: "false"
+      - key: WORKER_CONCURRENCY
+        value: "2"
+      - key: FILE_RETENTION_MINUTES
+        value: "120"
+      - key: MAX_UPLOAD_BYTES
+        value: "536870912"
+      - key: MAX_MEDIA_SECONDS
+        value: "14400"
+      - key: MAX_CONCURRENT_JOBS_PER_SESSION
+        value: "3"
+      - key: URL_INGEST_ENABLED
+        value: "true"
+      # ---- Optional providers -------------------------------------------------
+      # Without these, AI and transcription tools honestly report themselves as
+      # unavailable instead of pretending to work. Set them in the Render
+      # dashboard (marked sync:false so they are never committed to git).
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: DEEPGRAM_MODEL
+        value: nova-2
+
+  - type: worker
+    name: royalway-worker
+    runtime: node
+    plan: standard
+    region: frankfurt
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm run worker --workspace server
+    autoDeploy: true
+    disk:
+      name: royalway-storage-worker
+      mountPath: /var/data
+      sizeGB: 20
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: STORAGE_DIR
+        value: /var/data
+      - key: DATABASE_URL
+        fromDatabase:
+          name: royalway-db
+          property: connectionString
+      - key: SESSION_SECRET
+        fromService:
+          type: web
+          name: royalway-one
+          envVarKey: SESSION_SECRET
+      - key: WORKER_CONCURRENCY
+        value: "3"
+      - key: FILE_RETENTION_MINUTES
+        value: "120"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DEEPGRAM_API_KEY
+        sync: false
+
+databases:
+  - name: royalway-db
+    plan: basic-256mb
+    region: frankfurt
+    postgresMajorVersion: "16"

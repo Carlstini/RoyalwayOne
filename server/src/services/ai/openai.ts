@@ -19,7 +19,10 @@ export class OpenAIProvider implements AIProvider {
     if (options.json) body.response_format = { type: 'json_object' };
     const data = await request(`${config.ai.openaiBaseUrl}/chat/completions`, config.ai.openaiKey, body, options.signal);
     const text = data?.choices?.[0]?.message?.content;
-    if (typeof text !== 'string') throw new AppError('The AI service returned an unexpected response. Please try again.', 502, 'AI_FAILED');
+    if (typeof text !== 'string' || !text.trim()) {
+      // Never present an empty answer as a successful result.
+      throw new AppError('The AI service returned an empty response. Please try again.', 502, 'AI_FAILED');
+    }
     return text;
   }
 
@@ -52,9 +55,17 @@ async function request(url: string, key: string, body: unknown, signal?: AbortSi
     }
     if (!res.ok) {
       logger.warn({ status: res.status, detail: (await res.text()).slice(0, 400) }, 'openai error');
+      if (res.status === 401 || res.status === 403) {
+        throw new AppError('AI is not configured correctly for this deployment.', 503, 'AI_NOT_CONFIGURED');
+      }
       throw new AppError('We could not complete this AI request. Please try again.', 502, 'AI_FAILED');
     }
-    return res.json();
+    try {
+      return await res.json();
+    } catch {
+      // A truncated or non-JSON body must never surface as an internal error.
+      throw new AppError('The AI service returned an unexpected response. Please try again.', 502, 'AI_FAILED');
+    }
   } catch (err) {
     if (err instanceof AppError) throw err;
     if ((err as Error).name === 'AbortError') throw new AppError('The AI request took too long. Please try again with a shorter document.', 504, 'AI_TIMEOUT');
