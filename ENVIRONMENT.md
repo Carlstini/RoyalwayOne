@@ -11,6 +11,26 @@ Every variable Royalway One reads, what it does, and whether it is required.
 
 ---
 
+## Quick answer: what must I set on Render?
+
+| Variable name | Required? | Set where |
+|---|---|---|
+| `OPENAI_API_KEY` | Required for AI **and** transcription | Render dashboard → `royalway-one` → Environment |
+| `DEEPGRAM_API_KEY` | Optional — better speaker diarization | Render dashboard → `royalway-one` → Environment |
+| `ANTHROPIC_API_KEY` | Optional — alternative to OpenAI | Render dashboard → `royalway-one` → Environment |
+
+Everything else in this document is already set for you by `render.yaml`,
+including `SESSION_SECRET` and `ADMIN_TOKEN`, which Render generates.
+
+There is a **single service**, so provider keys are configured in exactly one
+place. (If you later split out a dedicated worker service — which requires
+migrating to shared object storage — that worker needs the *same* provider keys,
+because it is the process that runs transcription and long AI jobs.)
+
+**Never put a key value in `render.yaml`, `.env.example`, or any tracked file.**
+
+---
+
 ## Required in production
 
 | Variable | Example | Notes |
@@ -24,7 +44,7 @@ Every variable Royalway One reads, what it does, and whether it is required.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `DATABASE_URL` | *(none)* | Postgres connection string. Without it the server falls back to a local JSON store, which is fine for one instance but **cannot** be shared with a separate worker service. |
+| `DATABASE_URL` | *(none)* | Postgres connection string. Without it the server falls back to a local JSON store, which is fine for a single instance. Required if you ever run a separate worker process, since the two must share one queue. |
 | `ADMIN_TOKEN` | *(none)* | Enables `/admin`. **While unset, every admin endpoint returns 404** — the dashboard simply does not exist. |
 | `PUBLIC_URL` | *(none)* | Canonical origin, used for sitemap/SEO URLs. |
 
@@ -99,10 +119,18 @@ Reuses `OPENAI_API_KEY`. Long recordings are automatically split into
 | `MAX_MEDIA_SECONDS` | `14400` (4 h) | Rejects longer audio/video before processing. |
 | `MAX_CONCURRENT_JOBS_PER_SESSION` | `3` | Anti-abuse, per anonymous session. |
 | `WORKER_CONCURRENCY` | `2` | Heavy jobs processed in parallel. Raise only with more CPU/RAM. |
-| `RUN_WORKER` | `true` | Set `false` on the web service when a dedicated worker service is running. |
+| `RUN_WORKER` | `true` | Whether this process also drains the job queue. Keep `true` on Render: the single web service owns the persistent disk and must process its own jobs. Set `false` only if a separate worker service runs against **shared object storage** (see DEPLOYMENT.md). |
 | `FRAME_ANCESTORS` | `'self'` in production | CSP `frame-ancestors`. Widen only if you intentionally embed the app. |
 | `URL_INGEST_ENABLED` | `true` | Allows transcribing a public media URL. SSRF-protected: private/loopback ranges are blocked. |
 | `YTDLP_PATH` | `yt-dlp` | Optional. Enables platform URLs where permitted; direct media links work without it. |
+
+## Diagnostics and advanced
+
+| Variable | Default | Notes |
+|---|---|---|
+| `LOG_LEVEL` | `info` in production, `debug` otherwise | Pino level: `trace`, `debug`, `info`, `warn`, `error`, `fatal`. File contents are never logged at any level. |
+| `CORS_ORIGINS` | *(empty)* | Comma-separated origin allow-list. Leave unset for the normal single-origin deployment, where the SPA and API share an origin and no CORS is needed. |
+| `TESSERACT_LANG_PATH` | `${STORAGE_DIR}/tessdata` | Directory holding OCR language data. Override to point at a pre-seeded cache. |
 
 ## Optional binaries
 

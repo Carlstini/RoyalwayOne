@@ -1,9 +1,13 @@
 # Architecture
 
-A **modular monolith**. One deployable server, one SPA, optional Postgres and an
-optional dedicated worker. Deliberately no Kubernetes, Kafka, RabbitMQ, Celery
-or Redis — the job volume does not justify them, and every added moving part is
-another thing that can silently break.
+A **modular monolith**. One deployable server, one SPA, optional Postgres.
+Deliberately no Kubernetes, Kafka, RabbitMQ, Celery or Redis — the job volume
+does not justify them, and every added moving part is another thing that can
+silently break.
+
+In the shipped Render topology the server also runs the job worker in-process,
+because the persistent disk holding uploads can only be mounted by one service.
+See DEPLOYMENT.md for why a separate worker service would break file access.
 
 ```
 ┌──────────────┐   HTTPS    ┌─────────────────────────────┐
@@ -20,9 +24,9 @@ another thing that can silently break.
                             │ events    │  │ outputs,tmp │
                             └───────────┘  └─────────────┘
                                     ▲
-                            ┌───────┴────────┐
-                            │ Worker process │  (optional, same codebase)
-                            └────────────────┘
+                    (job worker runs in-process by default;
+                     a standalone entrypoint exists for a future
+                     shared-object-storage deployment)
 ```
 
 ## Layers
@@ -87,9 +91,14 @@ The client polls with backoff and shows the current stage. Stages are truthful:
 where real progress cannot be measured, the bar is indeterminate rather than
 faking a percentage.
 
-With `DATABASE_URL`, jobs live in Postgres and a separate worker can drain the
-queue. Without it, an equivalent JSON store backs the same interface — fine for
-one instance, but a separate worker then has nothing to share.
+With `DATABASE_URL`, jobs live in Postgres. Without it, an equivalent JSON store
+backs the same interface — fine for a single instance.
+
+By default the API process runs the worker loop itself (`RUN_WORKER=true`), so
+queued jobs are processed with bounded concurrency without blocking requests.
+A standalone worker entrypoint (`npm run worker --workspace server`) exists for
+a future deployment backed by shared object storage; it requires `DATABASE_URL`
+and storage both processes can reach.
 
 ## Storage and signed downloads
 

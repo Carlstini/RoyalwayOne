@@ -10,6 +10,23 @@ A Royalway Media product.
 
 ---
 
+## Deployment status
+
+| Stage | Status |
+|---|---|
+| Application implementation | Complete |
+| Automated tests (79 unit/integration) | Passing |
+| Local end-to-end verification of every tool | Passing |
+| AI/transcription verified against a **live provider** | **Pending** — requires a real API key |
+| Deployed to Render and tested in production | **Pending** — requires a Render account |
+
+The AI and transcription code paths were validated locally against a
+protocol-level contract harness that speaks the exact OpenAI and Deepgram wire
+formats. That proves this application's request construction, authentication,
+response parsing, grounding, error handling and exports are correct — it does
+**not** prove live-provider operation, and it is not presented as such. See
+DEPLOYMENT.md.
+
 ## The one rule
 
 **No fake functionality.** Every visible tool really works. Real PDF processing,
@@ -66,8 +83,8 @@ clearly that they are not switched on. See **[ENVIRONMENT.md](ENVIRONMENT.md)**.
 ## Architecture at a glance
 
 A modular monolith: one Express + TypeScript server, one React + Vite frontend,
-optional Postgres, optional dedicated worker. No Kubernetes, Kafka, RabbitMQ,
-Celery or Redis.
+optional Postgres. The server processes queued jobs in-process. No Kubernetes,
+Kafka, RabbitMQ, Celery or Redis.
 
 ```
 client/   React 19 + Vite SPA

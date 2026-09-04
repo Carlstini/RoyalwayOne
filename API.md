@@ -51,6 +51,19 @@ workflows and capability booleans.
 ### `GET /api/tools/search?q=compress`
 Ranked search across names, descriptions and keywords.
 
+### `GET /api/tools/:id`
+A single tool definition: `{ "ok": true, "tool": { ... } }`, or `404` if the id
+is unknown.
+
+### `POST /api/tools/suggest`
+Given the files in the workspace, returns the tools that make sense for them.
+
+```json
+{ "files": [ { "name": "report.pdf", "mime": "application/pdf" } ] }
+```
+
+Response: `{ "ok": true, "suggestions": [ /* tool definitions */ ] }`.
+
 ### `POST /api/tools/run`
 
 ```json
@@ -105,6 +118,17 @@ coordinates.
 
 All AI endpoints return `503 AI_NOT_CONFIGURED` when no provider key is set.
 
+### `GET /api/ai/status`
+Whether AI is configured, and the task list the UI should offer.
+
+```json
+{ "ok": true, "available": true,
+  "tasks": [ { "id": "summary", "label": "Summary" }, ... ] }
+```
+
+`available` is `false` when no provider key is set — the UI uses this to show
+its honest unavailable state. No key value is ever returned.
+
 ### `POST /api/ai/:task`
 Tasks: `summarize`, `executive-summary`, `key-points`, `action-items`,
 `decisions`, `topics`, `questions`, `meeting-minutes`, `follow-up-email`,
@@ -139,6 +163,14 @@ when the document does not contain the answer.
 ## Transcription
 
 Return `503 TRANSCRIPTION_NOT_CONFIGURED` when no provider key is set.
+
+### `GET /api/transcription/status`
+```json
+{ "ok": true, "available": true, "urlPlatformSupport": false }
+```
+
+`available` reflects whether a transcription provider key is configured.
+`urlPlatformSupport` reports whether `yt-dlp` is present for platform URLs.
 
 ### `POST /api/transcription`
 `{ "fileId": "...", "language": "", "diarize": true, "analyse": true }` → a job.

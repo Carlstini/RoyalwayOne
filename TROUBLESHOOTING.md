@@ -12,8 +12,8 @@ curl localhost:8080/api/capabilities   # expect "ai": true
 Still false?
 
 - Check the exact variable name — `OPENAI_API_KEY`, not `OPENAI_KEY`.
-- On Render, set it on **both** the web service and the worker, and wait for the
-  redeploy to finish.
+- On Render, set it on the `royalway-one` service and wait for the redeploy to
+  finish. (There is a single service, so there is only one place to set it.)
 - Look for `ai: not configured` in the logs at boot.
 
 ## "Transcription is not switched on"
@@ -23,10 +23,15 @@ covers AI *and* transcription.
 
 ## Transcription jobs stay queued forever
 
-The worker is not draining the queue. Either the worker service is down, or the
-web service has `RUN_WORKER=false` with no worker running, or the two processes
-are not sharing a queue because `DATABASE_URL` is unset (the JSON fallback is
-per-process). Set `DATABASE_URL` on both.
+Nothing is draining the queue. Check `RUN_WORKER`: on Render it must be `true`,
+because the single web service processes its own jobs. If you have set it to
+`false` without running a separate worker, jobs will queue forever.
+
+If you *are* running a separate worker service, it must share both the job queue
+(`DATABASE_URL` set on both processes — the JSON fallback is per-process) **and**
+the file storage. On Render a persistent disk cannot be mounted by two services,
+so a disk-backed worker will fail with "One of your files is no longer
+available." That topology requires shared object storage.
 
 ## "The AI service is busy right now"
 
